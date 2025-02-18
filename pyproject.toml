@@ -1,0 +1,122 @@
+[project]
+name = "GMOPayment"
+authors = [
+    {name = "Binod Kafle", email = "mebinod50@gmail.com"},
+]
+requires  = ["python>=3.9"]
+version = "1.0.0"
+description = "GMO Payment"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "GMOPayment.settings"
+# -- recommended but optional:
+python_files = ["test_*.py", "*_test.py", "testing/python/*.py"]
+addopts = ["--reuse-db"]
+cache_dir = ".pytest_cache"
+log_cli = "true"
+filterwarnings = "ignore"
+log_cli_level = "WARNING"
+required_plugins = "pytest-django pytest-xdist"
+markers = [
+    "slow: mark test as slow",
+    "skip: mark test as skipped",
+    "skipif: mark test as skipped if condition is met",
+    "xfail: mark test as expected to fail",
+    "parametrize: mark test as parametrized",
+    "pytest: mark test as pytest",
+    "unittest: mark test as unittest",
+    "integration: mark test as integration",
+    "unit: mark test as unit",
+    "e2e: mark test as end-to-end",
+    "smoke: mark test as smoke",
+    "performance: mark test as performance",
+    "regression: mark test as regression",
+    "acceptance: mark test as acceptance",
+    "functional: mark test as functional",
+    "security: mark test as security",
+    "sanity: mark test as sanity",
+    "api: mark test as api",
+    "ui: mark test as ui",
+    "db: mark test as db",
+    "service: mark test as service",
+    "component: mark test as component",
+    "system: mark test as system",
+    "dont_run_in_ci: mark test as prevent running in CI",
+]
+
+[tool.bandit]
+exclude_dirs = ["migrations", "tests"]
+
+[tool.pyright]
+# from https://microsoft.github.io/pyright/#/configuration?id=sample-pyprojecttoml-file
+typeCheckingMode = "standard"
+useLibraryCodeForTypes = true
+venvPath = ".venv"
+include = ["GMOPayment"]
+reportMissingImports = true
+reportMissingTypeStubs = false
+stubPath = "typings"
+pythonVersion = "3.11"
+
+[tool.mypy]
+python_version = "3.11"
+check_untyped_defs = true
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_return_any = true
+follow_imports = "silent"
+warn_redundant_casts = true
+warn_unused_configs = true
+plugins = ["mypy_django_plugin.main", "mypy_drf_plugin.main"]
+exclude = ["migrations", ".venv", "chat-test", "tests"]
+
+[[tool.mypy.overrides]]
+module = "*.migrations.*"
+ignore_errors = true
+
+[tool.django-stubs]
+django_settings_module = "GMOPayment.settings"
+ignore_missing_settings = true
+ignore_missing_models = true
+ignore_missing_migrations = true
+
+[tool.ruff]
+exclude = ["migrations", ".venv", "venv", ".env", "env"]
+cache-dir = "~/.cache/ruff"
+line-length = 120
+show-fixes = true
+lint.select = ["E", "F", "W"]
+lint.ignore = ["E501", "S605", "S607", "ANN101", "ANN003", "ANN002", "ISC001",
+    "ANN401", "S104", "S101", "S311", "ARG002", "B017", "D200", "D201", "D202",
+    "D213", "D203",
+]
+lint.extend-select = [
+    "B", "C", "D", "I", "C90", "S", "ANN", "BLE", "FBT", "DTZ", "DJ", "EM", "ISC", "ICN",
+    "FURB", "PERF", "TRY", "PTH", "ARG", "SIM", "RET", "PIE", "LOG", "UP", "PYI", "PT", "TID",
+    "TD", "PD", "RUF"
+]
+target-version = "py311"
+preview = true
+
+[tool.ruff.lint.isort]
+case-sensitive = true
+lines-after-imports = 2
+known-first-party = ["django", "rest_framework"]
+known-third-party = ["stripe", "twilio"]
+known-local-folder = ["GMOPayment"]
+length-sort = false
+length-sort-straight = true
+split-on-trailing-comma = true
+relative-imports-order = "furthest-to-closest"
+force-sort-within-sections = true
+force-wrap-aliases = true
+section-order = [
+    "future",
+    "standard-library",
+    "first-party",
+    "third-party",
+    "local-folder",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
