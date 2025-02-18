@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -53,8 +54,6 @@ ROOT_URLCONF = "GMOPayment.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / 'templates']
-        ,
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -121,3 +120,15 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+GMO_PAYMENT = {
+    "shop_id": config("SHOP_ID"),
+    "shop_password": config("SHOP_PASSWORD"),
+    "site_id": config("SITE_ID"),
+    "site_password": config("SITE_PASSWORD"),
+    "is_production": config("IS_PRODUCTION", cast=bool),
+    "prod_api_url": config("PROD_API_URL"),
+    "test_api_url": config("TEST_API_URL"),
+    "prod_oauth_url": config("PROD_OAUTH_URL"),
+    "test_oauth_url": config("TEST_OAUTH_URL"),
+}
