@@ -1,0 +1,1 @@
+# GMOPayment - Django + GMO Payment Gateway
