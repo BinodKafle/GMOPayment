@@ -16,9 +16,17 @@ Including another URLconf
 """
 # from django.contrib import admin
 from django.urls import path
-from .views import CreatePaymentView, PaymentStatusView
+from .views.member import MemberViewSet
+from .views.merchant import MerchantViewSet
+from .views.payment_methods import PaymentMethodListCreateView
+from .views.transaction import TransactionListCreateView
 
 urlpatterns = [
-    path("payments/create", CreatePaymentView.as_view(), name="create-payment"),
-    path("payments/<str:payment_id>/status", PaymentStatusView.as_view(), name="payment-status"),
+    path('members', MemberViewSet.as_view(), name='member-list'),
+
+    path('merchants', MerchantViewSet.as_view(), name='merchant-list'),
+
+    path('payment-methods', PaymentMethodListCreateView.as_view(), name='payment-method-list'),
+
+    path('transactions', TransactionListCreateView.as_view(), name='transaction-list'),
 ]
