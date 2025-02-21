@@ -16,13 +16,14 @@ Including another URLconf
 """
 # from django.contrib import admin
 from django.urls import path
-from .views.member import MemberViewSet
+from .views.member import MemberViewSet, MemberRetrieveView
 from .views.merchant import MerchantViewSet
 from .views.payment_methods import PaymentMethodListCreateView
 from .views.transaction import TransactionListCreateView
 
 urlpatterns = [
     path('members', MemberViewSet.as_view(), name='member-list'),
+    path('members/inquiry', MemberRetrieveView.as_view(), name='member-retrieve'),
 
     path('merchants', MerchantViewSet.as_view(), name='merchant-list'),
 

@@ -31,13 +31,11 @@ class GMOMemberService:
     def get_member(self, member_id: str) -> dict[str, Any]:
         """Retrieves a member from the GMO Payment Gateway."""
         payload = {
-            "SiteID": self.client.config.site_id,
-            "SitePass": self.client.config.site_password,
-            "MemberID": member_id,
+            "memberId": member_id,
         }
 
         try:
-            response = self.client.post("SearchMember.idPass", payload)
+            response = self.client.post("member/inquiry", payload)
             logger.info(f"Successfully retrieved member: {member_id}")
             return response
         except GMOAPIError as e:
