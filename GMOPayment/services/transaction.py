@@ -1,20 +1,20 @@
 import logging
-from typing import Any, Optional
+from typing import Any
 
-from ..gmo_client import GMOClient, get_client
-from GMOPayment.exceptions import GMOAPIError
+from ..gmo_client import GMOHttpClient
+from GMOPayment.exceptions import GMOAPIException
 
 logger = logging.getLogger(__name__)
 
 class GMOTransactionService:
-    def __init__(self, client: Optional[GMOClient] = None):
-        self.client = client or get_client()
+    def __init__(self):
+        self.client = GMOHttpClient()
 
     def create_transaction(self, order_id: str, amount: int, job_cd: str = "AUTH") -> dict[str, Any]:
         """Creates a transaction equivalent in GMO (EntryTran)."""
         payload = {
-            "ShopID": self.client.config.shop_id,
-            "ShopPass": self.client.config.shop_password,
+            "ShopID": self.client.credentials.shop_id,
+            "ShopPass": self.client.credentials.shop_password,
             "OrderID": order_id,
             "JobCd": job_cd,
             "Amount": amount,
@@ -24,7 +24,7 @@ class GMOTransactionService:
             response = self.client.post("EntryTran.idPass", payload)
             logger.info(f"Successfully created transaction for order: {order_id}")
             return response
-        except GMOAPIError as e:
+        except GMOAPIException as e:
             logger.error(f"Failed to create transaction for order {order_id}: {e!s}")
             raise
 
@@ -47,7 +47,7 @@ class GMOTransactionService:
             response = self.client.post("ExecTran.idPass", payload)
             logger.info(f"Successfully confirmed transaction for order: {order_id}")
             return response
-        except GMOAPIError as e:
+        except GMOAPIException as e:
             logger.error(f"Failed to confirm transaction for order {order_id}: {e!s}")
             raise
 
@@ -65,7 +65,7 @@ class GMOTransactionService:
             response = self.client.post("AlterTran.idPass", payload)
             logger.info(f"Successfully captured transaction for order {order_id} with amount: {amount}")
             return response
-        except GMOAPIError as e:
+        except GMOAPIException as e:
             logger.error(f"Failed to capture transaction for order {order_id}: {e!s}")
             raise
 
@@ -82,6 +82,6 @@ class GMOTransactionService:
             response = self.client.post("AlterTran.idPass", payload)
             logger.info(f"Successfully cancelled transaction for order: {order_id}")
             return response
-        except GMOAPIError as e:
+        except GMOAPIException as e:
             logger.error(f"Failed to cancel transaction for order {order_id}: {e!s}")
             raise

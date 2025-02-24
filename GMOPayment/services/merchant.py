@@ -1,18 +1,18 @@
-from typing import Any, Optional
+from typing import Any
 import logging
 
-from ..gmo_client import GMOClient, get_client
-from GMOPayment.exceptions import GMOAPIError
+from ..gmo_client import GMOHttpClient
+from GMOPayment.exceptions import GMOAPIException
 
 
 logger = logging.getLogger(__name__)
 
 
 class GMOMerchantService:
-    def __init__(self, client: Optional[GMOClient] = None):
-        self.client = client or get_client()
-        self.site_id = self.client.config.site_id  # Use separate SiteID for merchants
-        self.site_pass = self.client.config.site_id
+    def __init__(self):
+        self.client = GMOHttpClient()
+        self.site_id = self.client.credentials.site_id  # Use separate SiteID for merchants
+        self.site_pass = self.client.credentials.site_id
 
     def create_merchant_account(self, merchant_id: str, merchant_name: str | None = None) -> dict[str, Any]:
         """Creates a merchant account in GMO (Managed as a special member)."""
@@ -28,7 +28,7 @@ class GMOMerchantService:
             response = self.client.post("SaveMember.idPass", payload)
             logger.info(f"Successfully created merchant account: {merchant_id}")
             return response
-        except GMOAPIError as e:
+        except GMOAPIException as e:
             logger.error(f"Failed to create merchant account {merchant_id}: {e!s}")
             raise
 
@@ -44,7 +44,7 @@ class GMOMerchantService:
             response = self.client.post("SearchMember.idPass", payload)
             logger.info(f"Successfully retrieved merchant account: {merchant_id}")
             return response
-        except GMOAPIError as e:
+        except GMOAPIException as e:
             logger.error(f"Failed to retrieve merchant account {merchant_id}: {e!s}")
             raise
 
@@ -60,7 +60,7 @@ class GMOMerchantService:
             response = self.client.post("DeleteMember.idPass", payload)
             logger.info(f"Successfully deleted merchant account: {merchant_id}")
             return response
-        except GMOAPIError as e:
+        except GMOAPIException as e:
             logger.error(f"Failed to delete merchant account {merchant_id}: {e!s}")
             raise
 

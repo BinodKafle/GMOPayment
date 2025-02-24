@@ -1,21 +1,21 @@
-from typing import Any, Optional
+from typing import Any
 import logging
 
-from ..gmo_client import GMOClient, get_client
-from GMOPayment.exceptions import GMOAPIError
+from ..gmo_client import GMOHttpClient
+from GMOPayment.exceptions import GMOAPIException
 
 
 logger = logging.getLogger(__name__)
 
 
 class GMOMemberService:
-    def __init__(self, client: Optional[GMOClient] = None):
-        self.client = client or get_client()
+    def __init__(self):
+        self.client = GMOHttpClient()
 
     def create_member(self, member_id: str, member_name: str | None = None) -> dict[str, Any]:
         """Creates a member in the GMO Payment Gateway."""
         payload = {
-            "memberId": f"MER-{member_id}",
+            "memberId": f"MEM-{member_id}",
         }
         if member_name:
             payload["memberName"] = member_name
@@ -24,7 +24,7 @@ class GMOMemberService:
             response = self.client.post("member/create", payload)
             logger.info(f"Successfully created member: {member_id}")
             return response
-        except GMOAPIError as e:
+        except GMOAPIException as e:
             logger.error(f"Failed to create member {member_id}: {e!s}")
             raise
 
@@ -38,15 +38,15 @@ class GMOMemberService:
             response = self.client.post("member/inquiry", payload)
             logger.info(f"Successfully retrieved member: {member_id}")
             return response
-        except GMOAPIError as e:
+        except GMOAPIException as e:
             logger.error(f"Failed to retrieve member {member_id}: {e!s}")
             raise
 
     def delete_member(self, member_id: str) -> dict[str, Any]:
         """Deletes a member from the GMO Payment Gateway."""
         payload = {
-            "SiteID": self.client.config.site_id,
-            "SitePass": self.client.config.site_password,
+            "SiteID": self.client.credentials.site_id,
+            "SitePass": self.client.credentials.site_password,
             "MemberID": member_id,
         }
 
@@ -54,6 +54,6 @@ class GMOMemberService:
             response = self.client.post("DeleteMember.idPass", payload)
             logger.info(f"Successfully deleted member: {member_id}")
             return response
-        except GMOAPIError as e:
+        except GMOAPIException as e:
             logger.error(f"Failed to delete member {member_id}: {e!s}")
             raise

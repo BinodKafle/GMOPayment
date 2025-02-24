@@ -18,7 +18,7 @@ Including another URLconf
 from django.urls import path
 from .views.member import MemberViewSet, MemberRetrieveView
 from .views.merchant import MerchantViewSet
-from .views.payment_methods import PaymentMethodListCreateView
+from .views.payment_methods import PaymentMethodListCreateView, CreateTokenView, VerifyCard, CardDetails
 from .views.transaction import TransactionListCreateView
 
 urlpatterns = [
@@ -27,7 +27,10 @@ urlpatterns = [
 
     path('merchants', MerchantViewSet.as_view(), name='merchant-list'),
 
-    path('payment-methods', PaymentMethodListCreateView.as_view(), name='payment-method-list'),
+    path('verify-card', VerifyCard.as_view(), name='verify-card'),
+    path('create-token', CreateTokenView.as_view(), name='create-token'),
+    path('store-card', PaymentMethodListCreateView.as_view(), name='payment-method'),
+    path('card-details', CardDetails.as_view(), name='card-details'),
 
     path('transactions', TransactionListCreateView.as_view(), name='transaction-list'),
 ]
