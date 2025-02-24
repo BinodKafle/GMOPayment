@@ -1,221 +1,274 @@
 import base64
-import json
-import threading
-import uuid
-from dataclasses import dataclass, field
-from urllib.parse import parse_qsl
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import Enum
+from functools import wraps
+from typing import Any, TypeVar, cast
+from urllib.parse import urljoin
 
-import requests
-import logging
-from typing import Dict, Any, Optional
 from django.conf import settings
+from django.core.cache import cache
+from django.core.exceptions import ImproperlyConfigured
+from rest_framework.exceptions import ValidationError
+from rest_framework import status
 
-from GMOPayment.exceptions import GMOValidationError, GMOAPIError, GMOConnectionError
+from requests.adapters import HTTPAdapter
+import requests
+from urllib3 import Retry
 
-_gmo_client = None
-_client_lock = threading.Lock()  # Ensures thread safety
+from GMOPayment.exceptions import GMONotAuthenticated, GMOValidationError, GMOPermissionDenied, GMONotFound, \
+    GMOConfigurationError, GMOAPIException, GMOAuthenticationError
 
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class GMOConfig:
-    """Configuration for GMO Payment Gateway."""
-    shop_id: str = field(default_factory=lambda: settings.GMO_PAYMENT.get("shop_id", ""))
-    shop_password: str = field(default_factory=lambda: settings.GMO_PAYMENT.get("shop_password", ""))
-    site_id: str = field(default_factory=lambda: settings.GMO_PAYMENT.get("site_id", ""))
-    site_password: str = field(default_factory=lambda: settings.GMO_PAYMENT.get("site_password", ""))
-    prod_api_url: str = field(default_factory=lambda: settings.GMO_PAYMENT.get("prod_api_url", ""))
-    test_api_url: str = field(default_factory=lambda: settings.GMO_PAYMENT.get("test_api_url", ""))
-    prod_oauth_url: str = field(default_factory=lambda: settings.GMO_PAYMENT.get("prod_oauth_url", ""))
-    test_oauth_url: str = field(default_factory=lambda: settings.GMO_PAYMENT.get("test_oauth_url", ""))
-    is_production: bool = field(default_factory=lambda: settings.GMO_PAYMENT.get("is_production", False))
-    timeout: int = field(default=30)  # Timeout in seconds
-
-    def __post_init__(self) -> None:
-        """Ensure valid configuration and set API URLs based on the environment."""
-        if not self.shop_id or not self.shop_password:
-            raise GMOValidationError("Shop ID and Shop Password are required")
-        if not self.site_id or not self.site_password:
-            raise GMOValidationError("Site ID and Site Password are required")
-        if not self.prod_api_url or not self.test_api_url:
-            raise GMOValidationError("Both production and test API URLs must be provided")
-        if not self.prod_oauth_url or not self.test_oauth_url:
-            raise GMOValidationError("Both production and test OAuth URLs must be provided")
-
-        self.api_url = self.prod_api_url if self.is_production else self.test_api_url
-        self.oauth_url = self.prod_oauth_url if self.is_production else self.test_oauth_url
-
-        logger.info(f"Using {'production' if self.is_production else 'test'} GMO environment")
+T = TypeVar('T', bound=Callable[..., Any])
 
 
-class GMOClient:
-    """Client for interacting with GMO Payment Gateway API."""
+class GMOEnvironment(str, Enum):
+    """Environment options for GMO API"""
 
-    def __init__(self, config: Optional[GMOConfig] = None):
-        self.config = config or self._load_default_config()
-        self.session = requests.Session()
-        self.access_token = None
-        self._get_access_token()
-        self.session.headers.update({
-            'Content-Type': 'application/json'
+    PRODUCTION = 'production'
+    TEST = 'test'
+
+    def __str__(self) -> str:
+        return self.value
+
+
+@dataclass(frozen=True, slots=True)
+class GMOCredentials:
+    """Immutable credentials for GMO API"""
+
+    shop_id: str
+    shop_password: str
+    site_id: str
+    site_password: str
+
+
+@dataclass(frozen=True, slots=True)
+class GMOUrls:
+    """Immutable URLs for GMO API"""
+
+    api_base_url: str
+    oauth_url: str
+
+
+def require_auth(func: T) -> T:
+    """Decorator to ensure authentication before making requests"""
+    @wraps(func)
+    def wrapper(self: 'GMOHttpClient', *args: Any, **kwargs: Any) -> Any:
+        if not self._access_token:
+            raise GMONotAuthenticated()
+        return func(self, *args, **kwargs)
+    return cast(T, wrapper)
+
+
+class GMOHttpClient:
+    """HTTP client for GMO Payment Gateway API"""
+
+    ERROR_STATUS_MAP = {
+        status.HTTP_400_BAD_REQUEST: GMOValidationError,
+        status.HTTP_401_UNAUTHORIZED: GMONotAuthenticated,
+        status.HTTP_403_FORBIDDEN: GMOPermissionDenied,
+        status.HTTP_404_NOT_FOUND: GMONotFound,
+        status.HTTP_422_UNPROCESSABLE_ENTITY: GMOValidationError,
+    }
+
+    def __init__(
+            self,
+            credentials: GMOCredentials | None = None,
+            environment: GMOEnvironment = GMOEnvironment.TEST,
+            timeout: int = 30,
+            max_retries: int = 3
+    ):
+        """Initialize GMO HTTP client"""
+        try:
+            self.credentials = credentials or self._load_credentials_from_settings()
+            self.environment = environment
+            self.timeout = timeout
+            self.urls = self._get_environment_urls()
+            self.session = self._configure_session(max_retries)
+            self._access_token: str | None = None
+        except ImproperlyConfigured as e:
+            raise GMOConfigurationError(str(e))
+
+    @staticmethod
+    def _load_credentials_from_settings() -> GMOCredentials:
+        """Load GMO credentials from Django settings"""
+        try:
+            gmo_settings = settings.GMO_PAYMENT
+            return GMOCredentials(
+                shop_id=gmo_settings['shop_id'],
+                shop_password=gmo_settings['shop_password'],
+                site_id=gmo_settings['site_id'],
+                site_password=gmo_settings['site_password']
+            )
+        except (AttributeError, KeyError) as e:
+            raise ImproperlyConfigured(f"Missing GMO Payment configuration: {e!s}")
+
+    def _get_environment_urls(self) -> GMOUrls:
+        """Get API URLs based on environment"""
+        try:
+            gmo_settings = settings.GMO_PAYMENT
+            if self.environment == GMOEnvironment.PRODUCTION:
+                return GMOUrls(
+                    api_base_url=gmo_settings['prod_api_url'],
+                    oauth_url=gmo_settings['prod_oauth_url']
+                )
+            return GMOUrls(
+                api_base_url=gmo_settings['test_api_url'],
+                oauth_url=gmo_settings['test_oauth_url']
+            )
+        except (AttributeError, KeyError) as e:
+            raise ImproperlyConfigured(f"Missing GMO Payment URLs: {e!s}")
+
+    def _configure_session(self, max_retries: int) -> requests.Session:
+        """Configure requests session with retry logic"""
+        session = requests.Session()
+
+        retry_strategy = Retry(
+            total=max_retries,
+            backoff_factor=0.5,
+            status_forcelist=[500, 502, 503, 504],
+            allowed_methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
+        )
+
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+
+        session.headers.update({
+            "Content-Type": "application/json",
+            "Accept": "application/json"
         })
 
-    @staticmethod
-    def _load_default_config() -> GMOConfig:
-        """Load default config using GMOConfig dataclass."""
-        return GMOConfig()
+        return session
 
-    def _get_access_token(self) -> None:
-        endpoint = f"{self.config.oauth_url}"
+    @property
+    def _token_cache_key(self) -> str:
+        """Get cache key for access token"""
+        return f"gmo_token_{self.credentials.shop_id}_{self.environment}"
 
-        credentials = f"{self.config.shop_id}:{self.config.shop_password}"
-        encoded_credentials = base64.b64encode(credentials.encode()).decode()
 
-        headers = {
-            "Authorization": f"Basic {encoded_credentials}",
-            "Content-Type": "application/x-www-form-urlencoded",
-        }
-        payload = {
-            "grant_type": "client_credentials",
-            "scope": "openapi",
-        }
+    def _handle_error_response(self, response: requests.Response) -> None:
+        """Handle error responses from GMO API"""
+        try:
+            error_data = response.json()
+        except ValueError:
+            error_data = None
+
+        if isinstance(error_data, dict):
+            detail = {
+                "code": str(error_data.get("title", "error")),
+                "detail": str(error_data.get("message") or error_data.get("error") or response.text),
+                "instance": str(error_data.get("instance", response.url)),
+            }
+        else:
+            detail = {"detail": str(response.text)}
+
+        exceptions = self.ERROR_STATUS_MAP.get(response.status_code, GMOAPIException)
+        raise exceptions(detail)
+
+
+    def authenticate(self) -> None:
+        """Authenticate with GMO API"""
+        if cached_token := cache.get(self._token_cache_key):
+            self._access_token = cached_token
+            self.session.headers["Authorization"] = f"Bearer {cached_token}"
+            return
 
         try:
-            response = self.session.post(endpoint, data=payload, headers=headers, timeout=30)
-            logger.debug(f"OAuth Response: {response.status_code} - {response.text}")
-            response.raise_for_status()
+            auth_string = f"{self.credentials.shop_id}:{self.credentials.shop_password}"
+            encoded_auth = base64.b64encode(auth_string.encode()).decode()
+
+            response = self.session.post(
+                self.urls.oauth_url,
+                headers={
+                    "Authorization": f"Basic {encoded_auth}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                data={
+                    "grant_type": "client_credentials",
+                    "scope": "openapi"
+                },
+                timeout=self.timeout
+            )
+
+            if not response.ok:
+                raise GMOAuthenticationError(
+                    f"Authentication failed: {response.text}"
+                )
 
             token_data = response.json()
-            self.access_token = token_data.get("access_token")
-            if not self.access_token:
-                raise GMOAPIError("Failed to retrieve access token")
+            if not (access_token := token_data.get("access_token")):
+                raise GMOAuthenticationError("No access token in response")
 
-            # Set Authorization Header for subsequent requests
-            self.session.headers.update({"Authorization": f"Bearer {self.access_token}"})
-            print(self.access_token)
-            logger.info("Successfully obtained GMO access token")
+            cache.set(self._token_cache_key, access_token, timeout=3600)
+            self._access_token = access_token
+            self.session.headers["Authorization"] = f"Bearer {access_token}"
 
         except requests.RequestException as e:
-            logger.error(f"Failed to get GMO access token: {e.response.text if e.response else str(e)}", exc_info=True)
-            raise GMOConnectionError(f"Failed to obtain access token: {str(e)}") from e
+            raise GMOAuthenticationError(f"Authentication request failed: {e!s}")
 
-    def _make_request(self, method: str, endpoint: str, params: Optional[Dict[str, Any]] = None,
-                      payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """Make a request to the GMO API and handle errors properly."""
-        url = f"{self.config.api_url}/{endpoint}"
-        request_id = str(uuid.uuid4())[:8]
-
-        # Log the request
-        self._log_request(request_id, endpoint, params, payload)
+    def request(
+            self,
+            method: str,
+            endpoint: str,
+            params: dict[str, Any] | None = None,
+            json_data: dict[str, Any] | None = None,
+            **kwargs: Any
+    ) -> dict[str, Any]:
+        """Make an authenticated request to the GMO API"""
+        # Check for cached token first
+        if cached_token := cache.get(self._token_cache_key):
+            self._access_token = cached_token
+            self.session.headers["Authorization"] = f"Bearer {cached_token}"
+        elif not self._access_token:
+            self.authenticate()
 
         try:
-            if method.upper() == "GET":
-                response = self.session.get(url, params=params, timeout=self.config.timeout)
-            elif method.upper() == "POST":
-                response = self.session.post(url, json=payload, timeout=self.config.timeout)
-            else:
-                raise ValueError("Invalid request method")
+            url = urljoin(self.urls.api_base_url, endpoint)
 
-            # Check for HTTP errors
-            try:
-                response.raise_for_status()
-            except requests.HTTPError:
-                try:
-                    error_json = response.json()
-                    error_message = error_json.get("message", error_json)
-                except (json.JSONDecodeError, AttributeError):
-                    error_message = response.text
+            response = self.session.request(
+                method=method.upper(),
+                url=url,
+                params=params,
+                json=json_data,
+                timeout=self.timeout,
+                **kwargs
+            )
 
-                logger.error(f"[{request_id}] GMO API returned HTTP error {response.status_code}: {error_message}")
-                raise GMOAPIError(f"{response.status_code}: {error_message}")
+            if response.status_code == status.HTTP_401_UNAUTHORIZED:
+                cache.delete(self._token_cache_key)
+                self.authenticate()
+                return self.request(method, endpoint, params, json_data, **kwargs)
 
-            # Parse the response
-            response_dict = self._parse_response(response.text)
+            if not response.ok:
+                self._handle_error_response(response)
 
-            # Log the response
-            self._log_response(request_id, response, response_dict)
+            return response.json()
 
-            # If the token expired, refresh it and retry
-            if response.status_code == 401:
-                logger.warning("Access token expired, refreshing token...")
-                self._get_access_token()
-                return self._make_request(method, endpoint, params, payload)
-
-            return response_dict
-
+        except requests.Timeout:
+            raise GMOAPIException(
+                detail=f"Request timed out after {self.timeout}s",
+                code='request_timeout'
+            )
         except requests.RequestException as e:
-            error_response = getattr(e.response, "text", str(e))
-            if isinstance(e, requests.Timeout):
-                raise GMOConnectionError(f"Request timed out after {self.config.timeout}s") from e
-            else:
-                raise GMOConnectionError(f"Connection error: {error_response}") from e
+            raise GMOAPIException(
+                detail=f"Request failed: {e!s}",
+                code='request_error'
+            )
 
+    # Convenience methods for common HTTP methods
+    def get(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
+        """Send GET request"""
+        return self.request("GET", endpoint, **kwargs)
 
-    @staticmethod
-    def _parse_response(response_text: str) -> Dict[str, str]:
-        """Parse GMO response from URL-encoded format to dictionary."""
-        if not response_text:
-            logger.warning("Empty response received from GMO API")
-            return {}
+    def post(self, endpoint: str, data: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+        """Send POST request"""
+        return self.request("POST", endpoint, json_data=data, **kwargs)
 
-        try:
-            # First, try parsing as JSON
-            return json.loads(response_text)
-        except json.JSONDecodeError:
-            logger.info("Response is not JSON, attempting URL-decoded parsing.")
+    def put(self, endpoint: str, data: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+        """Send PUT request"""
+        return self.request("PUT", endpoint, json_data=data, **kwargs)
 
-        try:
-            # If JSON parsing fails, fallback to URL-decoded parsing
-            return dict(parse_qsl(response_text))
-        except Exception as e:
-            logger.error(f"Failed to parse response: {response_text}")
-            raise GMOAPIError(f"Failed to parse response: {str(e)}")
-
-    @staticmethod
-    def _mask_sensitive_data(data: Dict[str, Any]) -> Dict[str, Any]:
-        """Mask sensitive data for logging."""
-        sensitive_keys = ['ShopPass', 'SitePass', 'CardNo', 'SecurityCode', 'Access']
-        masked_data = data.copy()
-
-        for key in masked_data:
-            for sensitive_key in sensitive_keys:
-                if sensitive_key in key:
-                    if isinstance(masked_data[key], str) and len(masked_data[key]) > 4:
-                        # Keep last 4 chars for debugging, mask the rest
-                        masked_data[key] = '****' + masked_data[key][-4:]
-                    else:
-                        masked_data[key] = '****'
-
-        return masked_data
-
-    def _log_request(self, request_id: str, endpoint: str, params: Dict[str, Any] = None, payload: Dict[str, Any] = None) -> None:
-        """Log the request details, masking sensitive information."""
-        masked_params = self._mask_sensitive_data(params.copy()) if params else None
-        masked_payload = self._mask_sensitive_data(payload.copy()) if payload else None
-        if masked_params:
-            logger.debug(f"[{request_id}] GMO Request to {endpoint} - Params: {masked_params}")
-        if masked_payload:
-            logger.debug(f"[{request_id}] GMO Request to {endpoint} - Payload: {masked_payload}")
-
-    def _log_response(self, request_id: str, response: requests.Response, response_dict: Dict[str, Any]) -> None:
-        """Log the response details, masking sensitive information."""
-        logger.debug(f"[{request_id}] GMO Response status: {response.status_code}")
-        masked_response = self._mask_sensitive_data(response_dict.copy())
-        logger.debug(f"[{request_id}] GMO Response: {masked_response}")
-
-    def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        return self._make_request("GET", endpoint, params=params)
-
-    def post(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-        return self._make_request("POST", endpoint, payload=payload)
-
-
-def get_client() -> GMOClient:
-    """Returns a singleton instance of GMOClient."""
-    global _gmo_client
-    if _gmo_client is None:
-        with _client_lock:  # Prevents race conditions in multithreaded environments
-            if _gmo_client is None:  # Double-check inside the lock
-                _gmo_client = GMOClient(GMOConfig())
-    return _gmo_client
+    def delete(self, endpoint: str, **kwargs: Any) -> dict[str, Any]:
+        """Send DELETE request"""
+        return self.request("DELETE", endpoint, **kwargs)
