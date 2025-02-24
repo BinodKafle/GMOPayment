@@ -133,4 +133,6 @@ GMO_PAYMENT = {
     "test_api_url": config("TEST_API_URL"),
     "prod_oauth_url": config("PROD_OAUTH_URL"),
     "test_oauth_url": config("TEST_OAUTH_URL"),
+    "prod_payment_method_token_url": config("PROD_PAYMENT_METHOD_TOKEN_URL"),
+    "test_payment_method_token_url": config("TEST_PAYMENT_METHOD_TOKEN_URL"),
 }

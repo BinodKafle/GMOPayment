@@ -47,6 +47,8 @@ class GMOUrls:
 
     api_base_url: str
     oauth_url: str
+    payment_method_token_url: str
+
 
 
 def require_auth(func: T) -> T:
@@ -109,11 +111,13 @@ class GMOHttpClient:
             if self.environment == GMOEnvironment.PRODUCTION:
                 return GMOUrls(
                     api_base_url=gmo_settings['prod_api_url'],
-                    oauth_url=gmo_settings['prod_oauth_url']
+                    oauth_url=gmo_settings['prod_oauth_url'],
+                    payment_method_token_url=gmo_settings['prod_payment_method_token_url']
                 )
             return GMOUrls(
                 api_base_url=gmo_settings['test_api_url'],
-                oauth_url=gmo_settings['test_oauth_url']
+                oauth_url=gmo_settings['test_oauth_url'],
+                payment_method_token_url=gmo_settings['test_payment_method_token_url'],
             )
         except (AttributeError, KeyError) as e:
             raise ImproperlyConfigured(f"Missing GMO Payment URLs: {e!s}")
