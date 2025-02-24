@@ -1,76 +1,64 @@
-from typing import Optional, Dict, Any
+import requests
+from rest_framework import status
+from rest_framework.exceptions import (
+    APIException,
+    AuthenticationFailed,
+    NotAuthenticated,
+    NotFound,
+    PermissionDenied,
+    ValidationError,
+)
 
-class GMOErrorCode:
-    """GMO error codes for better error handling and structured error messages."""
+class GMOAPIException(APIException):
+    """Base exception for GMO API errors"""
 
-    # Standard GMO error codes
-    INVALID_SHOP_ID = "E01"
-    INVALID_SHOP_PASSWORD = "E02"
-    INVALID_CARD_NUMBER = "E41"
-    EXPIRED_CARD = "E42"
-    SECURITY_CODE_MISSING = "E44"
-    CARD_REJECTED = "G12"
-    TRANSACTION_NOT_FOUND = "G30"
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = 'An error occurred while processing the GMO API request.'
+    default_code = 'gmo_api_error'
 
-    # Error message mapping
-    MESSAGES = {
-        INVALID_SHOP_ID: "Invalid shop ID provided",
-        INVALID_SHOP_PASSWORD: "Invalid shop password provided",
-        INVALID_CARD_NUMBER: "Invalid card number provided",
-        EXPIRED_CARD: "The card has expired",
-        SECURITY_CODE_MISSING: "Security code is required but missing",
-        CARD_REJECTED: "The card was rejected by the payment processor",
-        TRANSACTION_NOT_FOUND: "Transaction not found",
-    }
-
-    @classmethod
-    def get_message(cls, code: str) -> str:
-        """Return a human-readable message for a given error code."""
-        return cls.MESSAGES.get(code, f"Unknown error (code: {code})")
-
-
-class GMOAPIError(Exception):
-    """Exception for GMO API errors with detailed error messages and response logging."""
-
-    def __init__(self, message: str, error_code: Optional[str] = None, response: Optional[Dict[str, Any]] = None):
-        self.error_code = error_code
+    def __init__(self, detail=None, code=None, response: requests.Response | None = None):
+        super().__init__(detail, code)
         self.response = response
 
-        # Append the detailed error message if the error code is recognized
-        detailed_message = GMOErrorCode.get_message(error_code) if error_code else None
-        self.message = f"{message} - {detailed_message}" if detailed_message else message
 
-        super().__init__(self.message)
+class GMOConfigurationError(GMOAPIException):
+    """Raised when GMO configuration is invalid"""
 
-    def __str__(self):
-        """Return a readable error message with debugging details."""
-        base_message = f"GMOAPIError: {self.message}"
-        if self.error_code:
-            base_message += f" (Error Code: {self.error_code})"
-        if self.response:
-            base_message += f" | Response: {self.response}"
-        return base_message
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    default_detail = 'GMO Payment Gateway is not properly configured.'
+    default_code = 'gmo_configuration_error'
 
 
-class GMOConnectionError(Exception):
-    """Exception for network/connection errors with GMO API."""
+class GMOAuthenticationError(AuthenticationFailed):
+    """Raised when authentication with GMO API fails"""
 
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(self.message)
-
-    def __str__(self):
-        """Return a readable error message."""
-        return f"GMOConnectionError: {self.message}"
+    default_detail = 'Failed to authenticate with GMO Payment Gateway.'
+    default_code = 'gmo_authentication_failed'
 
 
-class GMOValidationError(Exception):
-    """Exception for validation errors in requests to GMO API."""
+class GMONotAuthenticated(NotAuthenticated):
+    """Raised when no authentication credentials are provided"""
 
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(self.message)
+    default_detail = 'Authentication credentials for GMO Payment Gateway were not provided.'
+    default_code = 'gmo_not_authenticated'
 
-    def __str__(self):
-        """Return a readable error message."""
-        return f"GMOValidationError: {self.message}"
+
+class GMOPermissionDenied(PermissionDenied):
+    """Raised when the request is not permitted"""
+
+    default_detail = 'You do not have permission to perform this action with GMO Payment Gateway.'
+    default_code = 'gmo_permission_denied'
+
+
+class GMOValidationError(ValidationError):
+    """Raised when request validation fails"""
+
+    default_detail = 'Invalid data provided for GMO Payment Gateway request.'
+    default_code = 'gmo_validation_error'
+
+
+class GMONotFound(NotFound):
+    """Raised when a resource is not found"""
+
+    default_detail = 'The requested GMO Payment Gateway resource was not found.'
+    default_code = 'gmo_not_found'
