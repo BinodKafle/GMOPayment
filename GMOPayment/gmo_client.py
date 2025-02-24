@@ -122,7 +122,8 @@ class GMOHttpClient:
         except (AttributeError, KeyError) as e:
             raise ImproperlyConfigured(f"Missing GMO Payment URLs: {e!s}")
 
-    def _configure_session(self, max_retries: int) -> requests.Session:
+    @staticmethod
+    def _configure_session(max_retries: int) -> requests.Session:
         """Configure requests session with retry logic"""
         session = requests.Session()
 
@@ -134,7 +135,6 @@ class GMOHttpClient:
         )
 
         adapter = HTTPAdapter(max_retries=retry_strategy)
-        session.mount("http://", adapter)
         session.mount("https://", adapter)
 
         session.headers.update({
@@ -210,13 +210,27 @@ class GMOHttpClient:
         except requests.RequestException as e:
             raise GMOAuthenticationError(f"Authentication request failed: {e!s}")
 
+    def get_endpoint_type(self, endpoint_type: str) -> str:
+        """Determines the type of endpoint based on the URL"""
+
+        endpoint_mapping = {
+            "default": self.urls.api_base_url,
+            "oauth": self.urls.oauth_url,
+            "pm_token": self.urls.payment_method_token_url,
+        }
+
+        endpoint_lower = endpoint_type.casefold()  # Case-insensitive matching
+
+        return next((v for k, v in endpoint_mapping.items() if k in endpoint_lower), "default")
+
     def request(
             self,
             method: str,
             endpoint: str,
+            endpoint_type: str,
             params: dict[str, Any] | None = None,
             json_data: dict[str, Any] | None = None,
-            **kwargs: Any
+            **kwargs: Any,
     ) -> dict[str, Any]:
         """Make an authenticated request to the GMO API"""
         # Check for cached token first
@@ -226,8 +240,10 @@ class GMOHttpClient:
         elif not self._access_token:
             self.authenticate()
 
+        base_url = self.get_endpoint_type(endpoint_type)
+
         try:
-            url = urljoin(self.urls.api_base_url, endpoint)
+            url = urljoin(base_url, endpoint)
 
             response = self.session.request(
                 method=method.upper(),
@@ -241,7 +257,7 @@ class GMOHttpClient:
             if response.status_code == status.HTTP_401_UNAUTHORIZED:
                 cache.delete(self._token_cache_key)
                 self.authenticate()
-                return self.request(method, endpoint, params, json_data, **kwargs)
+                return self.request(method, endpoint, endpoint_type, params, json_data, **kwargs)
 
             if not response.ok:
                 self._handle_error_response(response)
@@ -264,9 +280,9 @@ class GMOHttpClient:
         """Send GET request"""
         return self.request("GET", endpoint, **kwargs)
 
-    def post(self, endpoint: str, data: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+    def post(self, endpoint: str, data: dict[str, Any], endpoint_type: str = "default", **kwargs: Any) -> dict[str, Any]:
         """Send POST request"""
-        return self.request("POST", endpoint, json_data=data, **kwargs)
+        return self.request("POST", endpoint, endpoint_type, json_data=data, **kwargs)
 
     def put(self, endpoint: str, data: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
         """Send PUT request"""
