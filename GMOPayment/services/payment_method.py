@@ -2,6 +2,7 @@ import base64
 import json
 from typing import Any
 import logging
+from decouple import config
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -19,7 +20,7 @@ class GMOPaymentMethodService:
     @staticmethod
     def encrypt_card(card_no: str, card_holder_name: str, expire_month: str, expire_year: str, security_code: str | None = None) -> str:
         # Public key string from the management screen (Base64 encoded)
-        public_key_string = "XXXX"
+        public_key_string = config("PM_TOKEN_PUBLIC_KEY")
 
         # Card information JSON string
         card_info_json = json.dumps({
@@ -55,14 +56,14 @@ class GMOPaymentMethodService:
         payload = {
             "encryptionParameters": {
                 "type": "UNIQUE_PK",
-                "apiKey": "N2RmNTRhNTBiN2ViMDJkNDZhMDQ4YmY2YTM0ZjY5ODVmZTM0YjgxMTJjYjJlYjhjOWIzMjhmNDYyZjQ1NDRlOXRzaG9wMDAwNzExNDE="
+                "apiKey": config("PM_TOKEN_API_KEY"),
             },
             "encryptedData": card_encrypted_data,
             "createCount": "1"
         }
 
         try:
-            response = self.client.post("payment/CreateToken.json", payload)
+            response = self.client.post("payment/CreateToken.json", payload, "pm_token")
             logger.info(f"Successfully created token for card: {card_no}")
             return response
         except GMOAPIException as e:
