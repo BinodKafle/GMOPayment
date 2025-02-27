@@ -82,60 +82,70 @@ class GMOTransactionService:
             logger.error(f"Failed to create transaction for order {order_id}: {e!s}")
             raise
 
-    def confirm_transaction(self, access_id: str, access_pass: str, order_id: str, method: int, card_no: str | None = None, expire: str | None = None, security_code: str | None = None) -> dict[str, Any]:
-        """Executes a transaction equivalent to confirming a payment (ExecTran)."""
+    def finalize_3d_secure_payment(self, access_id: str):
         payload = {
-            "AccessID": access_id,
-            "AccessPass": access_pass,
-            "OrderID": order_id,
-            "Method": method,
+            "accessId": access_id,
         }
 
-        if card_no and expire:
-            payload["CardNo"] = card_no
-            payload["Expire"] = expire
-        if security_code:
-            payload["SecurityCode"] = security_code
-
         try:
-            response = self.client.post("ExecTran.idPass", payload)
-            logger.info(f"Successfully confirmed transaction for order: {order_id}")
+            response = self.client.post("tds2/finalizeCharge", payload)
+            logger.info(f"Finalize 3ds charge")
             return response
         except GMOAPIException as e:
-            logger.error(f"Failed to confirm transaction for order {order_id}: {e!s}")
+            logger.error(f"Failed to finalize transaction {e!s}")
             raise
 
-    def capture_transaction(self, access_id: str, access_pass: str, order_id: str, amount: int) -> dict[str, Any]:
+    def update_order(self, access_id: str, amount: str):
+        payload = {
+            "accessId": access_id,
+            "amount": amount,
+            "authorizationMode": "CAPTURE",
+        }
+        try:
+            response = self.client.post("order/update", payload)
+            logger.info(f"Successfully updated order for access_id: {access_id}")
+            return response
+        except GMOAPIException as e:
+            logger.error(f"Failed to update order for access_id {access_id}: {e!s}")
+            raise
+
+    def capture_transaction(self, access_id: str) -> dict[str, Any]:
         """Captures an authorized transaction with a different amount in GMO (AlterTran)."""
         payload = {
-            "AccessID": access_id,
-            "AccessPass": access_pass,
-            "OrderID": order_id,
-            "JobCd": "SALES",  # Capture the authorized amount
-            "Amount": amount,
+            "accessId": access_id,
         }
 
         try:
-            response = self.client.post("AlterTran.idPass", payload)
-            logger.info(f"Successfully captured transaction for order {order_id} with amount: {amount}")
+            response = self.client.post("order/capture", payload)
+            logger.info(f"Successfully captured transaction")
             return response
         except GMOAPIException as e:
-            logger.error(f"Failed to capture transaction for order {order_id}: {e!s}")
+            logger.error(f"Failed to capture transaction {e!s}")
             raise
 
-    def cancel_transaction(self, access_id: str, access_pass: str, order_id: str, job_cd: str = "VOID") -> dict[str, Any]:
+    def cancel_transaction(self, access_id: str) -> dict[str, Any]:
         """Cancels a transaction equivalent in GMO (AlterTran)."""
         payload = {
-            "AccessID": access_id,
-            "AccessPass": access_pass,
-            "OrderID": order_id,
-            "JobCd": job_cd,
+            "accessId": access_id,
         }
 
         try:
-            response = self.client.post("AlterTran.idPass", payload)
-            logger.info(f"Successfully cancelled transaction for order: {order_id}")
+            response = self.client.post("order/cancel", payload)
+            logger.info(f"Successfully cancelled transaction")
             return response
         except GMOAPIException as e:
-            logger.error(f"Failed to cancel transaction for order {order_id}: {e!s}")
+            logger.error(f"Failed to cancel transaction")
+            raise
+
+    def inquiry_transaction_order(self, access_id: str) -> dict[str, Any]:
+        """Cancels a transaction equivalent in GMO (AlterTran)."""
+        payload = {
+            "accessId": access_id,
+        }
+
+        try:
+            response = self.client.post("order/inquiry", payload)
+            return response
+        except GMOAPIException as e:
+            logger.error(f"Failed to inquiry transaction")
             raise

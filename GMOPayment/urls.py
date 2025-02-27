@@ -19,7 +19,8 @@ from django.urls import path
 from .views.member import MemberViewSet, MemberRetrieveView
 from .views.merchant import MerchantViewSet
 from .views.payment_methods import PaymentMethodListCreateView, CreateTokenView, VerifyCard, CardDetails
-from .views.transaction import TransactionCreateView
+from .views.transaction import TransactionCreateView, TransactionOrderUpdateView, TransactionOrderCaptureView, \
+    TransactionOrderCancelView, TransactionOrderInqueryView, Finalize3dsPaymentView
 
 urlpatterns = [
     path('members', MemberViewSet.as_view(), name='member-list'),
@@ -33,4 +34,10 @@ urlpatterns = [
     path('card-details', CardDetails.as_view(), name='card-details'),
 
     path('transactions-create', TransactionCreateView.as_view(), name='transaction-create'),
+    path('tds2/finalize-charge', Finalize3dsPaymentView.as_view(), name='transaction-finalize'),
+    path('order/update', TransactionOrderUpdateView.as_view(), name='transaction-update'),
+    path('order/capture', TransactionOrderCaptureView.as_view(), name='transaction-capture'),
+    path('order/cancel', TransactionOrderCancelView.as_view(), name='transaction-cancel'),
+    path('order/inquiry', TransactionOrderInqueryView.as_view(), name='transaction-inquiry'),
 ]
+
