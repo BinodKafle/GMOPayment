@@ -10,18 +10,72 @@ class GMOTransactionService:
     def __init__(self):
         self.client = GMOHttpClient()
 
-    def create_transaction(self, order_id: str, amount: int, job_cd: str = "AUTH") -> dict[str, Any]:
+    def create_transaction_with_payment_method(self, order_id: int, card_token: str) -> dict[str, Any]:
         """Creates a transaction equivalent in GMO (EntryTran)."""
         payload = {
-            "ShopID": self.client.credentials.shop_id,
-            "ShopPass": self.client.credentials.shop_password,
-            "OrderID": order_id,
-            "JobCd": job_cd,
-            "Amount": amount,
-        }
+              "merchant": {
+                "name": "Binod Test Store",
+                "nameKana": "ジーエムオーストア",
+                "nameAlphabet": "Sample Store",
+                "nameShort": "サンプル",
+                "contactName": "サポート窓口",
+                "contactEmail": "support@example.com",
+                "contactUrl": "https://example.com/contact",
+                "contactPhone": "0120-123-456",
+                "contactOpeningHours": "10:00-18:00",
+                "callbackUrl": "https://example.com/callback",
+                "webhookUrl": "https://example.com/webhook",
+                "csrfToken": "bdb04c5f-42f0-29e2-0979-edae3e7760bf"
+              },
+              "order": {
+                "orderId": order_id,
+                "amount": "1000",
+                "currency": "JPY",
+                "clientFields": {
+                  "clientField1": "Test 1",
+                },
+                "items": [
+                  {
+                    "name": "コーヒー豆",
+                    "description": "service_title",
+                    "quantity": 1,
+                    "type": "SERVICE",
+                    "price": "10",
+                    "category": "7996", # https://github.com/greggles/mcc-codes/blob/main/mcc_codes.json#L8427C13-L8427C17
+                    "productId": "service_id",
+                  }
+                ],
+                "transactionType": "MIT",
+              },
+              "payer": {
+                "name": "buyer_name",
+                "nameKana": "ミホン　タロウ",
+                "nameAlphabet": "Taro Mihon",
+                "gender": "MALE",
+                "dateOfBirth": "19950308",
+                "email": "example@example.com",
+                "accountId": "user_id",
+                "ip": "172.16.0.1",
+                "deviceType": "MOBILE_APP",
+                "osType": "IOS",
+                "httpUserAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36"
+              },
+              "creditInformation": {
+                "tokenizedCard": {
+                  "type": "MP_TOKEN",
+                  "token": card_token
+                },
+                "creditChargeOptions": {
+                  "authorizationMode": "AUTH",
+                  "useTds2": True,
+                  "useFraudDetection": True,
+                  "paymentMethod": "ONE_TIME",
+                }
+              }
+            }
 
         try:
-            response = self.client.post("EntryTran.idPass", payload)
+            response = self.client.post("credit/charge", payload)
             logger.info(f"Successfully created transaction for order: {order_id}")
             return response
         except GMOAPIException as e:

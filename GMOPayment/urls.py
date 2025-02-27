@@ -19,7 +19,7 @@ from django.urls import path
 from .views.member import MemberViewSet, MemberRetrieveView
 from .views.merchant import MerchantViewSet
 from .views.payment_methods import PaymentMethodListCreateView, CreateTokenView, VerifyCard, CardDetails
-from .views.transaction import TransactionListCreateView
+from .views.transaction import TransactionCreateView
 
 urlpatterns = [
     path('members', MemberViewSet.as_view(), name='member-list'),
@@ -32,5 +32,5 @@ urlpatterns = [
     path('store-card', PaymentMethodListCreateView.as_view(), name='payment-method'),
     path('card-details', CardDetails.as_view(), name='card-details'),
 
-    path('transactions', TransactionListCreateView.as_view(), name='transaction-list'),
+    path('transactions-create', TransactionCreateView.as_view(), name='transaction-create'),
 ]
