@@ -1,4 +1,5 @@
 from rest_framework import generics, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -27,12 +28,29 @@ class VerifyCard(APIView):
         response = self.service.verify_card(member_id, card_token)
         return Response(response, status=status.HTTP_200_OK)
 
-class CardDetails(APIView):
+class CardDetailsByToken(APIView):
     service = GMOPaymentMethodService()
 
     def post(self, request, *args, **kwargs):
         card_token = request.data.get("card_token")
-        response = self.service.get_card_details(card_token)
+        response = self.service.get_card_details_by_token(card_token)
+        return Response(response, status=status.HTTP_200_OK)
+
+
+class CardDetailsByMember(APIView):
+    service = GMOPaymentMethodService()
+
+    def post(self, request, *args, **kwargs):
+        member_id = request.data.get("member_id")
+        card_type = request.data.get("card_type")
+        card_id = request.data.get("card_id")
+        if not member_id:
+            raise ValidationError("member_id is required.")
+        if not card_type:
+            raise ValidationError("card_type is required.")
+        if not card_id:
+            raise ValidationError("card_id is required.")
+        response = self.service.get_card_details_by_member(member_id, card_type, card_id)
         return Response(response, status=status.HTTP_200_OK)
 
 class CreateTokenView(APIView):

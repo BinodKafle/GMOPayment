@@ -139,7 +139,7 @@ class GMOPaymentMethodService:
             logger.error(f"Failed to save card for member {member_id}: {e!s}")
             raise
 
-    def get_card_details(self, token: str) -> dict[str, Any]:
+    def get_card_details_by_token(self, token: str) -> dict[str, Any]:
         """Retrieves saved cards for a member."""
         payload = {
               "cardInformation": {
@@ -157,6 +157,27 @@ class GMOPaymentMethodService:
             return response
         except GMOAPIException as e:
             logger.error(f"Failed to retrieve cards for token {token}: {e!s}")
+            raise
+
+
+    def get_card_details_by_member(self, member_id: str, card_type: str, card_id: str) -> dict[str, Any]:
+        """Retrieves saved cards for a member."""
+        payload = {
+            "cardInformation": {
+                "onfileCard": {
+                    "memberId": member_id,
+                    "type": card_type,
+                    "cardId": card_id
+                }
+            }
+        }
+
+        try:
+            response = self.client.post("credit/getCardDetails", payload)
+            logger.info(f"Successfully retrieved cards for member_id: {member_id}")
+            return response
+        except GMOAPIException as e:
+            logger.error(f"Failed to retrieve cards for member_id: {member_id}: {e!s}")
             raise
 
     def delete_card(self, member_id: str, card_seq: str) -> dict[str, Any]:
