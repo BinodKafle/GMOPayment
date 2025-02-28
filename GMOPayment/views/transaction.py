@@ -6,7 +6,7 @@ from rest_framework.views import APIView
 from GMOPayment.services.transaction import GMOTransactionService
 
 
-class TransactionCreateView(APIView):
+class TransactionCreditChargeView(APIView):
     service = GMOTransactionService()
 
     def post(self, request, *args, **kwargs):
@@ -17,6 +17,23 @@ class TransactionCreateView(APIView):
         if not card_token:
             raise ValidationError("Card token is required.")
         response = self.service.create_transaction_with_new_payment_method(order_id, card_token, )
+        return Response(response, status=status.HTTP_201_CREATED)
+
+
+class TransactionCreditOnFileChargeView(APIView):
+    service = GMOTransactionService()
+
+    def post(self, request, *args, **kwargs):
+        order_id = request.data.get("order_id")
+        member_id = request.data.get("member_id")
+        card_id = request.data.get("card_id")
+        if not order_id:
+            raise ValidationError("order_id is required.")
+        if not member_id:
+            raise ValidationError("member_id is required.")
+        if not card_id:
+            raise ValidationError("card_id is required.")
+        response = self.service.create_transaction_with_registered_payment_method(order_id, member_id, card_id)
         return Response(response, status=status.HTTP_201_CREATED)
 
 

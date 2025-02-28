@@ -20,8 +20,8 @@ from .views.member import MemberViewSet, MemberRetrieveView, MemberDeleteView
 from .views.merchant import MerchantViewSet
 from .views.payment_methods import PaymentMethodListCreateView, CreateTokenView, VerifyCard, CardDetailsByToken, \
     CardDetailsByMember
-from .views.transaction import TransactionCreateView, TransactionOrderUpdateView, TransactionOrderCaptureView, \
-    TransactionOrderCancelView, TransactionOrderInqueryView, Finalize3dsPaymentView
+from .views.transaction import TransactionCreditChargeView, TransactionOrderUpdateView, TransactionOrderCaptureView, \
+    TransactionOrderCancelView, TransactionOrderInqueryView, Finalize3dsPaymentView, TransactionCreditOnFileChargeView
 
 urlpatterns = [
     path('members', MemberViewSet.as_view(), name='member-list'),
@@ -37,7 +37,8 @@ urlpatterns = [
     path('card-details/token', CardDetailsByToken.as_view(), name='card-details-token'),
     path('card-details/member', CardDetailsByMember.as_view(), name='card-details-token'),
 
-    path('transactions/credit/charge', TransactionCreateView.as_view(), name='transaction-create'),
+    path('transactions/credit/charge', TransactionCreditChargeView.as_view(), name='transaction-create'),
+    path('transactions/credit/on-file/charge', TransactionCreditOnFileChargeView.as_view(), name='transaction-create'),
     path('tds2/finalize-charge', Finalize3dsPaymentView.as_view(), name='transaction-finalize'),
     path('order/update', TransactionOrderUpdateView.as_view(), name='transaction-update'),
     path('order/capture', TransactionOrderCaptureView.as_view(), name='transaction-capture'),
