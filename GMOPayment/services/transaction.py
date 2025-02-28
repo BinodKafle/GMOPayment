@@ -10,7 +10,7 @@ class GMOTransactionService:
     def __init__(self):
         self.client = GMOHttpClient()
 
-    def create_transaction_with_payment_method(self, order_id: int, card_token: str) -> dict[str, Any]:
+    def create_transaction_with_new_payment_method(self, order_id: int, card_token: str) -> dict[str, Any]:
         """Creates a transaction equivalent in GMO (EntryTran)."""
         payload = {
               "merchant": {

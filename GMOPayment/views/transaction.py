@@ -16,7 +16,7 @@ class TransactionCreateView(APIView):
             raise ValidationError("Order ID is required.")
         if not card_token:
             raise ValidationError("Card token is required.")
-        response = self.service.create_transaction_with_payment_method(order_id, card_token, )
+        response = self.service.create_transaction_with_new_payment_method(order_id, card_token, )
         return Response(response, status=status.HTTP_201_CREATED)
 
 

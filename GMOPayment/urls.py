@@ -37,7 +37,7 @@ urlpatterns = [
     path('card-details/token', CardDetailsByToken.as_view(), name='card-details-token'),
     path('card-details/member', CardDetailsByMember.as_view(), name='card-details-token'),
 
-    path('transactions-create', TransactionCreateView.as_view(), name='transaction-create'),
+    path('transactions/credit/charge', TransactionCreateView.as_view(), name='transaction-create'),
     path('tds2/finalize-charge', Finalize3dsPaymentView.as_view(), name='transaction-finalize'),
     path('order/update', TransactionOrderUpdateView.as_view(), name='transaction-update'),
     path('order/capture', TransactionOrderCaptureView.as_view(), name='transaction-capture'),
