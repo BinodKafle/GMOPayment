@@ -25,7 +25,8 @@ class VerifyCard(APIView):
     def post(self, request, *args, **kwargs):
         member_id = request.data.get("member_id")
         card_token = request.data.get("card_token")
-        response = self.service.verify_card(member_id, card_token)
+        order_id = request.data.get("order_id")
+        response = self.service.verify_card(order_id, card_token)
         return Response(response, status=status.HTTP_200_OK)
 
 class CardDetailsByToken(APIView):

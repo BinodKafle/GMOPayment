@@ -70,36 +70,63 @@ class GMOPaymentMethodService:
             logger.error(f"Failed to create token for card {card_no}: {e!s}")
             raise
 
-    def verify_card(self, member_id: str, card_token: str) -> dict[str, Any]:
+    def verify_card(self, order_id: str, card_token: str) -> dict[str, Any]:
         payload = {
-              "merchant": {
-                "name": "Merchant Binod",
+            "merchant": {
+                "name": "Binod Test Store",
                 "nameKana": "ジーエムオーストア",
-                "nameAlphabet": "Soudan",
+                "nameAlphabet": "Sample Store",
                 "nameShort": "サンプル",
-                "contactName": "Binod Kafle",
+                "contactName": "サポート窓口",
+                "contactEmail": "support@example.com",
+                "contactUrl": "https://example.com/contact",
                 "contactPhone": "0120-123-456",
                 "contactOpeningHours": "10:00-18:00",
-                "callbackUrl": "https://example.com/callback"
+                "callbackUrl": "https://example.com/callback",
+                "webhookUrl": "https://example.com/webhook",
+                "csrfToken": "bdb04c5f-42f0-29e2-0979-edae3e7760bf"
             },
-              "order": {
-                "orderId": "order-001",
-                "transactionType": "CIT",
-              },
-              "payer": {
-                "name": "Saurav Adhikari",
-              },
-              "creditVerificationInformation": {
-                "tokenizedCard": {
-                  "type": "MP_TOKEN",
-                  "token": card_token
+            "order": {
+                "orderId": order_id,
+                "amount": "1000",
+                "currency": "JPY",
+                "clientFields": {
+                    "clientField1": "Test 1",
                 },
-              "creditVerificationOptions": {
-                  "useTds2": False,
-                  "itemCode": "0000990"
-              },
-              },
+                "items": [
+                    {
+                        "name": "コーヒー豆",
+                        "description": "service_title",
+                        "quantity": 1,
+                        "type": "SERVICE",
+                        "price": "10",
+                        "category": "7996",
+                        # https://github.com/greggles/mcc-codes/blob/main/mcc_codes.json#L8427C13-L8427C17
+                        "productId": "service_id",
+                    }
+                ],
+                "transactionType": "MIT",
+            },
+            "payer": {
+                "name": "buyer_name",
+                "nameKana": "ミホン　タロウ",
+                "nameAlphabet": "Taro Mihon",
+                "gender": "MALE",
+                "dateOfBirth": "19950308",
+                "email": "example@example.com",
+                "accountId": "user_id",
+                "ip": "172.16.0.1",
+                "deviceType": "MOBILE_APP",
+                "osType": "IOS",
+                "httpUserAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.61 Safari/537.36"
+            },
+            "creditVerificationInformation": {
+                "tokenizedCard": {
+                    "token": card_token,
+                    "type": "MP_TOKEN",
+                },
             }
+        }
         try:
             response = self.client.post("credit/verifyCard", payload)
             return response
