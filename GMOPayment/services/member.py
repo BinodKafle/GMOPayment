@@ -45,13 +45,11 @@ class GMOMemberService:
     def delete_member(self, member_id: str) -> dict[str, Any]:
         """Deletes a member from the GMO Payment Gateway."""
         payload = {
-            "SiteID": self.client.credentials.site_id,
-            "SitePass": self.client.credentials.site_password,
-            "MemberID": member_id,
+            "memberId": member_id,
         }
 
         try:
-            response = self.client.post("DeleteMember.idPass", payload)
+            response = self.client.post("member/delete", payload)
             logger.info(f"Successfully deleted member: {member_id}")
             return response
         except GMOAPIException as e:

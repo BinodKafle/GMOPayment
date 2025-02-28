@@ -35,3 +35,14 @@ class MemberRetrieveView(APIView):
             raise ValidationError("Member ID is required.")
         response = self.service.get_member(member_id)
         return Response(response, status=status.HTTP_200_OK)
+
+
+class MemberDeleteView(APIView):
+    service = GMOMemberService()
+
+    def delete(self, request, *args, **kwargs):
+        member_id = request.data.get("member_id")
+        if not member_id:
+            raise ValidationError("member_id is required.")
+        response = self.service.delete_member(member_id)
+        return Response(response, status=status.HTTP_202_ACCEPTED)

@@ -16,7 +16,7 @@ Including another URLconf
 """
 # from django.contrib import admin
 from django.urls import path
-from .views.member import MemberViewSet, MemberRetrieveView
+from .views.member import MemberViewSet, MemberRetrieveView, MemberDeleteView
 from .views.merchant import MerchantViewSet
 from .views.payment_methods import PaymentMethodListCreateView, CreateTokenView, VerifyCard, CardDetails
 from .views.transaction import TransactionCreateView, TransactionOrderUpdateView, TransactionOrderCaptureView, \
@@ -24,6 +24,8 @@ from .views.transaction import TransactionCreateView, TransactionOrderUpdateView
 
 urlpatterns = [
     path('members', MemberViewSet.as_view(), name='member-list'),
+    path('members/delete', MemberDeleteView.as_view(), name='member-delete'),
+
     path('members/inquiry', MemberRetrieveView.as_view(), name='member-retrieve'),
 
     path('merchants', MerchantViewSet.as_view(), name='merchant-list'),
